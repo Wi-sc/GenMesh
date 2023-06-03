@@ -27,8 +27,8 @@ conda activate nvf
 ```
 There are other dependencies to be installed.
 
-3. To train and test the model, libaries for [chamfer distance](https://github.com/otaheri/chamfer_distance), 
-4. To test the model, [earth mover distance](https://github.com/daerduoCarey/PyTorchEMD) are needed. 
+1. To train and test the model, libaries for [chamfer distance](https://github.com/otaheri/chamfer_distance), 
+2. To test the model, [earth mover distance](https://github.com/daerduoCarey/PyTorchEMD) are needed. 
 
 The commands have been incorperated by `create_env.sh`. You can install them via runing the script:
 ```
@@ -59,8 +59,8 @@ Please specify the desired experiment name before running.
 ## Contact
 For questions and comments please leave your questions in the issue or contact Xianghui Yang via email xianghui.yang@sydney.edu.au.
 
-## Acknoladgement
-Part of the renderings are downloaded from [3D-R2N2](https://github.com/chrischoy/3D-R2N2). Thanks for their releasing.
+## Acknowledgement
+Part of the renderings (13 catergories over 16) are downloaded from [3D-R2N2](https://github.com/chrischoy/3D-R2N2). Thanks for their releasing.
 
 ```
 @ARTICLE{10138738,
