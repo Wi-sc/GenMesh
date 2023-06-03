@@ -22,43 +22,27 @@ conda activate nvf
 ```
 There are other dependencies to be installed.
 
-1. To train the model, relavattive operations in [point-transfomrer](https://github.com/POSTECH-CVLab/point-transformer) are needed. 
-2. To extract meshes, [meshUDF](https://github.com/cvlab-epfl/MeshUDF) is needed. 
-3. To test the model, libaries for [chamfer distance](https://github.com/otaheri/chamfer_distance), [earth mover distance](https://github.com/daerduoCarey/PyTorchEMD) are needed. 
+3. To train and test the model, libaries for [chamfer distance](https://github.com/otaheri/chamfer_distance), 
+4. To test the model, [earth mover distance](https://github.com/daerduoCarey/PyTorchEMD) are needed. 
 
 The commands have been incorperated by `create_env.sh`. You can install them via runing the script:
 ```
-bash create_env.sh
+pip install git+'https://github.com/otaheri/chamfer_distance'
+cd PyTorchEMD
+python setup.py install
 ```
 Or you can install step by step by yourself.
 
 ## Data Preparation
-First, create a configuration file in folder `configs/`, use `configs/shapenet_cube_offset_generalization_pt_vq_k16.txt` as reference and see configs/config_loader.py for detailed explanation of all configuration options. Change the desired data directory with variable `SAVE_DIR` in `create_split_generalization.py`, `convert_to_scaled_off.py ` and `boundary_sampling.py`. Please also make sure to move the split files `split_generalization_*.npz` from `dataprocessing` to your desired `SAVE_DIR`.
-
-Next, prepare the data for NVF using
-```
-python dataprocessing/preprocess.py --config configs/shapenet_cube_offset_generalization_pt_vq_k16.txt
-```
-You can generate a random test/training/validation split of the data using
-```
-python dataprocessing/create_split.py --config configs/shapenet_cube_offset_generalization_pt_vq_k16.txt
-```
-but replacing `configs/shapenet_cube_offset_generalization_pt_vq_k16.txt` in the commands with the desired configuration.
+Dowanload the ShapeNet dataset and corresponding renderings. We provide our renderings and split file here.
 
 ## Training
 To train your NVF, you can change the parameters in the configs and run:
 ```
-python train_generalization.py --config ./configs/${exp_name}.txt 2>&1|tee ${save_dir}/log.txt
+bash train.sh
 ```
-In the `experiments/ `folder you can find an experiment folder containing the model checkpoints, the checkpoint of validation minimum, and a folder containing a tensorboard summary, which can be started at with
-```
-tensorboard --logdir experiments/${exp_name}/summary/ --host 0.0.0.0
-```
-## Generation
-To generate meshes after training:
-```
-python generation.py
-```
+In the `log/ `folder you can find an experiment folder containing the model checkpoints. You can monitor the training and visulization using visdom with link http://localhost:8077.
+
 Please specify the desired model before running.
 ## Test
 To test results after generation:
@@ -69,9 +53,6 @@ Please specify the desired experiment name before running.
 
 ## Contact
 For questions and comments please leave your questions in the issue or contact Xianghui Yang via email xianghui.yang@sydney.edu.au.
-
-## Acknowledge
-The code is modified from the [NDF](https://github.com/jchibane/ndf). Thanks for open-sourcing.
 
 ```
 @ARTICLE{10138738,
