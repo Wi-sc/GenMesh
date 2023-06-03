@@ -3,8 +3,13 @@
 The is the released codes for "Single-view 3D Mesh Reconstruction for Seen and Unseen Categories". Published in IEEE Transactions on Image Processing (TIP).
 
 [Paper](https://ieeexplore.ieee.org/document/10138738) -
-[Arxiv](https://arxiv.org/abs/2303.04341) -
+[Arxiv](https://arxiv.org/abs/2303.04341)
 
+## TODO
+- [x] Upload the data processing codes.
+- [ ] Upload dataset and update the download link.
+- [ ] Clean the codes.
+  
 ## Requirements
 The codes have been tested on the linux Ubuntu 20.04 system with NVIDIA RTX3090ti. The enviroment inlcude:
 * Python=3.9
@@ -15,7 +20,7 @@ The codes have been tested on the linux Ubuntu 20.04 system with NVIDIA RTX3090t
 Please clone the repository and navigate into it in your terminal, its location is assumed for all subsequent commands.
 
 ## Installation
-The `nvf.yml` file contains all necessary python dependencies for the project. You can create the anaconda environment using: 
+The `environment.yaml` file contains all necessary python dependencies for the project. You can create the anaconda environment using: 
 ```
 conda env create -f nvf.yml
 conda activate nvf
@@ -34,7 +39,7 @@ python setup.py install
 Or you can install step by step by yourself.
 
 ## Data Preparation
-Dowanload the ShapeNet dataset and corresponding renderings. We provide our renderings and split file here.
+Dowanload the ShapeNet dataset and corresponding [renderings](). We provide our renderings and split file here. Run the preprocess scipt in the fold `preprossing/` to normalize the mesh. We also provide the processed files here.
 
 ## Training
 To train your NVF, you can change the parameters in the configs and run:
@@ -53,6 +58,9 @@ Please specify the desired experiment name before running.
 
 ## Contact
 For questions and comments please leave your questions in the issue or contact Xianghui Yang via email xianghui.yang@sydney.edu.au.
+
+## Acknoladgement
+Part of the renderings are downloaded from [3D-R2N2](https://github.com/chrischoy/3D-R2N2). Thanks for their releasing.
 
 ```
 @ARTICLE{10138738,
