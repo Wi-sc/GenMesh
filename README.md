@@ -24,7 +24,7 @@ Please clone the repository and navigate into it in your terminal, its location 
 The `environment.yaml` file contains all necessary python dependencies for the project. You can create the anaconda environment using: 
 ```
 conda env create -f environment.yaml
-conda activate nvf
+conda activate GenMesh
 ```
 There are other dependencies to be installed.
 
@@ -33,21 +33,21 @@ There are other dependencies to be installed.
 
 The commands have been incorperated by `create_env.sh`. You can install them via runing the script:
 ```
-# install chamfer distance
-pip install git+'https://github.com/otaheri/chamfer_distance'
-
-# install chamfer distance
-cd PyTorchEMD
-python setup.py install
-
 # install pointnet++
 sudo apt-get install ninja-build
 pip install .
+
+# install Chamfer Distance
+pip install git+'https://github.com/otaheri/chamfer_distance'
+
+# install Earth Mover Distance
+cd PyTorchEMD
+python setup.py install
 ```
 Or you can install step by step by yourself.
 
 ## Data Preparation
-Dowanload the ShapeNet dataset and corresponding [renderings](). We provide our renderings and split file here. Run the preprocess scipt in the fold `preprossing/` to normalize the mesh. We also provide the processed files here.
+Dowanload the ShapeNet [dataset](https://shapenet.org/) and corresponding [renderings](http://cvgl.stanford.edu/data2/ShapeNetRendering.tgz) in the [3D-R2N2](https://github.com/chrischoy/3D-R2N2). We provide our renderings and split file here. Run the preprocess scipt in the fold `preprossing/` to normalize the mesh. We also provide the processed files [here](https://unisyd-my.sharepoint.com/:f:/g/personal/xianghui_yang_sydney_edu_au/EmvKf9eYuPNElrbxKrSAib0BbB-rPPmG3oyrU_gEv5hyEQ?e=Mhxdlo).
 
 ## Training
 To visualize the generated meshes, make sure you lauch the visdom server before trianing.
