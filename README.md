@@ -65,6 +65,7 @@ For questions and comments please leave your questions in the issue or contact X
 
 ## Acknowledgement
 Part of the renderings (13 catergories over 16) are downloaded from [3D-R2N2](https://github.com/chrischoy/3D-R2N2). Thanks for their releasing.
+The point encoder is pointnet++ implemented by [Michael Danielczuk](https://github.com/mjd3/pointnet2). Thanks for his implementation.
 
 ## Citation
 If you find our work useful, please cite our paper. :smile:
