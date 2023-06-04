@@ -1,5 +1,6 @@
 # GenMesh
-<img src="./demo/demo.gif" data-canonical-src="./demo/demo.gif" width="1200" height="700" />
+<img src="./demo/demo.gif" data-canonical-src="./demo/demo.gif" width="640" height="640" />
+
 The is the released codes for "Single-view 3D Mesh Reconstruction for Seen and Unseen Categories". Published in IEEE Transactions on Image Processing (TIP).
 
 [Paper](https://ieeexplore.ieee.org/document/10138738) -
@@ -22,7 +23,7 @@ Please clone the repository and navigate into it in your terminal, its location 
 ## Installation
 The `environment.yaml` file contains all necessary python dependencies for the project. You can create the anaconda environment using: 
 ```
-conda env create -f nvf.yml
+conda env create -f environment.yaml
 conda activate nvf
 ```
 There are other dependencies to be installed.
@@ -32,9 +33,16 @@ There are other dependencies to be installed.
 
 The commands have been incorperated by `create_env.sh`. You can install them via runing the script:
 ```
+# install chamfer distance
 pip install git+'https://github.com/otaheri/chamfer_distance'
+
+# install chamfer distance
 cd PyTorchEMD
 python setup.py install
+
+# install pointnet++
+sudo apt-get install ninja-build
+pip install .
 ```
 Or you can install step by step by yourself.
 
