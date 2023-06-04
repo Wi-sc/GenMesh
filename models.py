@@ -12,20 +12,9 @@ from pytorch3d.loss import mesh_laplacian_smoothing
 from pytorch3d.renderer import TexturesVertex
 # from pointnet2_utils import PointNetSetAbstraction
 from pointnet2.pointnet2_modules import PointnetFPModule, PointnetSAModule, my_PointnetSAModule
-from pytorch3d.renderer import (
-    look_at_view_transform,
-    TexturesVertex,
-    FoVOrthographicCameras, 
-    FoVPerspectiveCameras,
-    PointsRasterizationSettings,
-    PointsRenderer,
-    PointsRasterizer,
-    NormWeightedCompositor
-)
-import sys
-sys.path.append("./external/")
-from pyTorchChamferDistance.chamfer_distance import ChamferDistance
-chamfer_distance = ChamferDistance()
+from pytorch3d.renderer import look_at_view_transform, FoVPerspectiveCameras
+from chamfer_distance import ChamferDistance 
+distChamfer = ChamferDistance()
 
 subdivide = SubdivideMeshes()
 
@@ -65,36 +54,6 @@ class BasicBlock(nn.Module):
         out = self.relu(out)
 
         return out
-
-# class PointNet2(nn.Module):
-#     def __init__(self, bottleneck_size, normal_channel=False):
-#         super(PointNet2, self).__init__()
-#         in_channel = 6 if normal_channel else 3
-#         self.normal_channel = normal_channel
-#         self.sa1 = PointNetSetAbstraction(npoint=512, radius=0.2, nsample=32, in_channel=in_channel, mlp=[64, 64, 128], group_all=False)
-#         self.sa2 = PointNetSetAbstraction(npoint=128, radius=0.4, nsample=64, in_channel=128 + 3, mlp=[128, 128, 256], group_all=False)
-#         self.sa3 = PointNetSetAbstraction(npoint=None, radius=None, nsample=None, in_channel=256 + 3, mlp=[256, 512, 1024], group_all=True)
-#         self.fc1 = nn.Linear(1024, 1024)
-#         self.bn1 = nn.BatchNorm1d(1024)
-#         self.drop1 = nn.Dropout(0.4)
-#         self.fc2 = nn.Linear(1024, bottleneck_size)
-#         self.bn2 = nn.BatchNorm1d(bottleneck_size)
-#         self.drop2 = nn.Dropout(0.4)
-
-#     def forward(self, xyz):
-#         B, _, _ = xyz.shape
-#         if self.normal_channel:
-#             norm = xyz[:, 3:, :]
-#             xyz = xyz[:, :3, :]
-#         else:
-#             norm = None
-#         l1_xyz, l1_points = self.sa1(xyz, norm)
-#         l2_xyz, l2_points = self.sa2(l1_xyz, l1_points)
-#         l3_xyz, l3_points = self.sa3(l2_xyz, l2_points)
-#         x = l3_points.view(B, 1024)
-#         x = self.drop1(F.relu(self.bn1(self.fc1(x))))
-#         x = self.drop2(F.relu(self.bn2(self.fc2(x))))
-#         return x
 
 class PointNetpp(nn.Module):
     def __init__(self, bottleneck_size=512):
@@ -199,7 +158,7 @@ class Network_0_shot(nn.Module):
             if xyz==None:
                 points_align_feats.append(feats.expand(-1, points.shape[1], -1))
             else:
-                _, _, idx, _ = chamfer_distance(points, xyz)
+                _, _, idx, _ = distChamfer(points, xyz)
                 idx = idx.detach()
                 idx = idx.long().unsqueeze(2).expand(-1, -1, feats.shape[-1])
                 sampled_feats = feats.gather(1, idx)
@@ -307,7 +266,7 @@ class Network_for_Pix3D(nn.Module):
             if xyz==None:
                 points_align_feats.append(feats.expand(-1, points.shape[1], -1))
             else:
-                _, _, idx, _ = chamfer_distance(points, xyz)
+                _, _, idx, _ = distChamfer(points, xyz)
                 idx = idx.detach()
                 idx = idx.long().unsqueeze(2).expand(-1, -1, feats.shape[-1])
                 sampled_feats = feats.gather(1, idx)
