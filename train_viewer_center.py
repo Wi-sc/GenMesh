@@ -4,9 +4,6 @@ import numpy as np
 import random
 import os, sys
 import time
-import matplotlib
-matplotlib.use('agg')  # use matplotlib without GUI support
-import matplotlib.pyplot as plt
 import visdom
 import torch
 from torch.utils.data import DataLoader
@@ -14,8 +11,6 @@ import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from collections import OrderedDict
 from models import Network_0_shot as Network
-# from Pixel2Mesh import Network
-# from shapenet import ShapeNet, collate_fn
 from dataset_shapenet_multi_view_silhouette import ShapeNet, collate_fn
 from utils import KaiMingInit, get_multi_view_silhouatte, get_grey_img, get_multi_view_silhouatte_test, AverageValueMeter
 from loss import get_iou, get_iou_loss
@@ -25,10 +20,7 @@ from pytorch3d.structures import Meshes
 from pytorch3d.utils import ico_sphere
 from pytorch3d.io import load_obj, save_obj
 from pytorch3d.renderer import TexturesVertex, look_at_view_transform, FoVPerspectiveCameras
-
-
-sys.path.append("./external/")
-from pyTorchChamferDistance.chamfer_distance import ChamferDistance
+from chamfer_distance import ChamferDistance 
 distChamfer = ChamferDistance()
 
 date = time.strftime('%Y-%m-%d',time.localtime())
@@ -45,15 +37,8 @@ parser.add_argument('--batch_size', type=int, default=16, help='input batch size
 parser.add_argument('--workers', type=int, help='number of data loading workers', default=4)
 parser.add_argument('--n_epoch', type=int, default=250, help='number of epochs to train for')
 parser.add_argument('--lr_step', type=int, default=100, help='step to decrease lr')
-parser.add_argument('--gpu', type=str, default='0', help='which gpu is available')
 parser.add_argument('--base_class', nargs='+', default=["car","chair","monitor","plane", "rifle","speaker","table","telephone"], type=str, help='target class')
 parser.add_argument('--novel_class', nargs='+', default=["bench", "bus", "cabinet", "lamp", "pistol", "sofa", "train", "watercraft"], type=str, help='target class')
-
-## dataset param
-parser.add_argument('--root_dir_train', type=str, default='/home/xianghui_yang/data/ShapeNet/', help='training dataset directory')
-parser.add_argument('--annot_train', type=str, default='pix3d.json', help='training dataset annotation file')
-parser.add_argument('--fine_tune', action='store_true', help='whether to exclude novel classes during training')
-parser.add_argument('--keypoint', action='store_true', help='use only samples with keypoint annotations')
 
 ## method param
 parser.add_argument('--img_size', type=int, default=224, help='input image dimension')
@@ -103,29 +88,6 @@ model = model.to(device)
 print(model)
 model.apply(KaiMingInit)
 
-# loed_model_name = '/home/xianghui_yang/object_center/log/2021-11-03_src2pcs2mesh_0shot_iou1e-1/model-99-0.0082.pth'
-# pretrained_dict = torch.load(loed_model_name)
-# new_pretrained_dict = OrderedDict()
-# for k,v in pretrained_dict.items():
-#     new_pretrained_dict[k]=pretrained_dict[k]
-#     if k.split('.')[0]=='deform_layers':
-#         new_k = k.split('.')
-#         new_k[0] = 'sphere_deform_layers'
-#         new_pretrained_dict['.'.join(new_k)]=pretrained_dict[k]
-#     if k.split('.')[0]=='pc_encoder':
-#         new_pretrained_dict[k]=pretrained_dict[k]
-# model.load_state_dict(new_pretrained_dict, strict=False)
-# loed_model_name = '/home/xianghui_yang/few_shot_3d/out/2021-04-03_src2trg_offset_1/pretrain.pth'
-# model_dict = model.state_dict()
-# pretrained_dict = {k: v for k, v in torch.load(loed_model_name).items() if (k in model_dict)}
-# for k,v in new_pretrained_dict.items():
-#     print(k)
-# model_dict.update(pretrained_dict)
-# model.load_state_dict(pretrained_dict, strict=True)
-# print("Previous weight loaded: ", loed_model_name)
-# model.load_state_dict(new_pretrained_dict, strict=False)
-# print("Previous weight loaded: ", loed_model_name)
-
 
 # =============DEFINE stuff for logs ======================= #
 result_path = os.path.join(os.getcwd(), opt.save_dir)
@@ -145,9 +107,9 @@ train_loss_avg_log = {
 }
 
 assert opt.display_id > 0
-vis = visdom.Visdom(server='http://172.16.13.175', port = opt.display_port, env=opt.save_dir.split('/')[-1], use_incoming_socket=False)
+vis = visdom.Visdom(server='http://localhost', port = opt.display_port, env=opt.save_dir.split('/')[-1], use_incoming_socket=False)
 plot_data_train = {'X':[],'Y':[], 'legend':[item for item in train_loss_avg_log.keys()]}
-plot_data_val = {'X':[],'Y':[], 'Init PCs':[], 'Pose':[], 'IoU':[], 'legend':[str(item) for item in opt.novel_class]+['mean']}
+plot_data_val = {'X':[],'Y':[], 'Init PCs':[], 'IoU':[], 'legend':[str(item) for item in opt.novel_class]+['mean']}
 train_dataloader_size = len(train_loader)
 print_freq = 100
 val_dataloader_size = len(val_loader)
@@ -164,16 +126,13 @@ def train(data_loader, optimizer):
         trg_mask = trg_mask.cuda()
         trg_pc = trg_pc.cuda()
         trg_normals = trg_normals.cuda()
-        # src_meshes = src_meshes.cuda()
         gt_pose_params = gt_pose_params.cuda()
         scale = scale.cuda()
         centroid = centroid.cuda()
         gt_multi_view = gt_multi_view.cuda()
+
         src_meshes = ico_sphere(4, trg_im.device).extend(trg_im.shape[0])
-        
-        # trg_pc = trg_pc * scale.unsqueeze(1) + centroid.unsqueeze(1)
-        
-        
+
         R_gt, T_gt = look_at_view_transform(dist=torch.ones(opt.batch_size).cuda()*1.4, elev=gt_pose_params[:, 1], azim=gt_pose_params[:, 0])
         cameras_gt = FoVPerspectiveCameras(device=device, R=R_gt, T=torch.zeros_like(T_gt).cuda(), fov=gt_pose_params[:, 3])
         transform_gt = cameras_gt.get_world_to_view_transform()
@@ -183,18 +142,13 @@ def train(data_loader, optimizer):
         # R, T = look_at_view_transform(dist=torch.ones(opt.batch_size).cuda()*1.38, elev=torch.zeros(opt.batch_size).cuda(), azim=torch.zeros(opt.batch_size).cuda())
         cameras = FoVPerspectiveCameras(device=device, R=torch.eye(3).unsqueeze(0).expand(opt.batch_size, 3, 3), T=T_gt, fov=gt_pose_params[:, 3])
         pred_meshes_list, pred_init_pcs, offset_list = model(trg_im, src_meshes, cameras, scale, rotate_centroid)
-        # pred_meshes_list, offset_list = model(trg_im, src_meshes, cameras, scale, rotate_centroid)
-        # print('pred verts', torch.any(torch.isnan(pred_meshes_list[-1].verts_padded())))
         
         pred_init_pcs = transform_gt_inverse.transform_points(pred_init_pcs)
         loss_chamfer_init_pcs, _= chamfer_distance(trg_pc, pred_init_pcs)
-        # loss_chamfer_init_pcs = torch.tensor(0.).cuda()
         loss_chamfer = torch.tensor(0.).cuda()
         loss_normal = torch.tensor(0.).cuda()
         loss_edge = torch.tensor(0.).cuda()
         loss_smooth = torch.tensor(0.).cuda()
-        # loss_normal_consistency = torch.tensor(0.).cuda()
-        # loss_silhouette = torch.tensor(0.).cuda()
 
         num_meshes = len(pred_meshes_list)
         skip_iter = False
@@ -222,18 +176,18 @@ def train(data_loader, optimizer):
             print("!!!!!!!!!!!!!!!!!!!!!!!!!Found NaN!!!!!!!!!!!!!!!!!!!!!!!!!")
             continue
 
-        # if epoch>=100:
-        #     final_meshes = pred_meshes_list[-1]
-        #     # verts = final_meshes.verts_padded()
-        #     # _centroid = torch.mean(verts, dim=1)
-        #     # verts = verts - _centroid.unsqueeze(1).expand_as(verts)
-        #     # _scale = torch.max(torch.sqrt(torch.sum(verts ** 2, dim=2)), dim=1)[0] + 1e-4
-        #     # verts = verts / _scale.unsqueeze(1).unsqueeze(1)
-        #     # final_meshes = final_meshes.update_padded(verts)
-        #     pre_multi_view, random_view_id = get_multi_view_silhouatte(final_meshes, centroid, scale, gt_pose_params[:, 4], gt_pose_params[:, 3])
-        #     loss_multi_view_silhouette = get_iou_loss(pre_multi_view, gt_multi_view[:, random_view_id, :, :])
-        # else:
-        loss_multi_view_silhouette = torch.tensor(0.).cuda()
+        if epoch>=100:
+            final_meshes = pred_meshes_list[-1]
+            # verts = final_meshes.verts_padded()
+            # _centroid = torch.mean(verts, dim=1)
+            # verts = verts - _centroid.unsqueeze(1).expand_as(verts)
+            # _scale = torch.max(torch.sqrt(torch.sum(verts ** 2, dim=2)), dim=1)[0] + 1e-4
+            # verts = verts / _scale.unsqueeze(1).unsqueeze(1)
+            # final_meshes = final_meshes.update_padded(verts)
+            pre_multi_view, random_view_id = get_multi_view_silhouatte(final_meshes, centroid, scale, gt_pose_params[:, 4], gt_pose_params[:, 3])
+            loss_multi_view_silhouette = get_iou_loss(pre_multi_view, gt_multi_view[:, random_view_id, :, :])
+        else:
+            loss_multi_view_silhouette = torch.tensor(0.).cuda()
 
         loss_chamfer_init_pcs = loss_chamfer_init_pcs * opt.chamfer_weight
         loss_chamfer = loss_chamfer * opt.chamfer_weight / num_meshes
@@ -241,11 +195,6 @@ def train(data_loader, optimizer):
         loss_edge =loss_edge * opt.edge_weight/ num_meshes
         loss_smooth = loss_smooth * opt.smooth_weight/ num_meshes
         loss_multi_view_silhouette = loss_multi_view_silhouette * opt.silhouette_weight
-        # loss_normal_consistency = loss_normal_consistency*opt.normal_consistency_weight/ num_meshes
-        # loss_silhouette = loss_silhouette * opt.silhouette_weight / num_meshes
-        # loss_depth_l1 = loss_depth_l1 * opt.depth_weight / num_meshes
-        # loss_silhouette = torch.tensor(0).cuda()
-        # loss_triplet = loss_triplet * opt.triplet_weight
         
 
         sum_loss = loss_chamfer + loss_normal + loss_edge + loss_smooth + \
@@ -275,9 +224,9 @@ def train(data_loader, optimizer):
             # vis_img = np.array(trg_pil_list[0]).transpose([2,0,1])
             vis_img = trg_im[0].data.cpu()
             vis.image(vis_img, win='INPUT IMAGE TRAIN', opts=dict(title="INPUT IMAGE TRAIN", width=opt.win_size, height=opt.win_size))
-            # if epoch>=100:
-            #     vis.image(gt_multi_view[0, random_view_id[0], :, :].data.cpu(), win='silhouette gt train', opts=dict(title="silhouette gt train", width=opt.win_size, height=opt.win_size))
-            #     vis.image(pre_multi_view[0, 0,:, :].data.cpu(), win='silhouette pred train', opts=dict(title="silhouette pred train", width=opt.win_size, height=opt.win_size))
+            if epoch>=100:
+                vis.image(gt_multi_view[0, random_view_id[0], :, :].data.cpu(), win='silhouette gt train', opts=dict(title="silhouette gt train", width=opt.win_size, height=opt.win_size))
+                vis.image(pre_multi_view[0, 0,:, :].data.cpu(), win='silhouette pred train', opts=dict(title="silhouette pred train", width=opt.win_size, height=opt.win_size))
             src_pc = sample_points_from_meshes(src_meshes, opt.point_num)
             pred_pc = sample_points_from_meshes(pred_meshes, opt.point_num, return_normals=False)
             vis.scatter(X=src_pc[0].data.cpu(),
@@ -292,14 +241,10 @@ def train(data_loader, optimizer):
                         win='TRAIN_GT',
                         opts=dict(title="TRAIN_GT", markersize=2, width=opt.win_size, height=opt.win_size),
                         )
-            # vis.scatter(X=pred_init_pcs[0].data.cpu(),
-            #             win='TRAIN_INIT_PCS',
-            #             opts=dict(title="TRAIN_INIT_PCS", markersize=2, width=opt.win_size, height=opt.win_size),
-            #             )
-            # vis.scatter(X=negative_points[0].data.cpu(),
-            #             win='TRAIN_NEGATIVE',
-            #             opts=dict(title="TRAIN_NEGATIVE", markersize=2, width=opt.win_size, height=opt.win_size),
-            #             )
+            vis.scatter(X=pred_init_pcs[0].data.cpu(),
+                        win='TRAIN_INIT_PCS',
+                        opts=dict(title="TRAIN_INIT_PCS", markersize=2, width=opt.win_size, height=opt.win_size),
+                        )
             
 
     plot_data_train['X'].append(epoch)
@@ -334,11 +279,11 @@ def test(data_loader, trg_classes):
             trg_mask = trg_mask.cuda()
             trg_pc = trg_pc.cuda()
             trg_normals = trg_normals.cuda()
-            # src_meshes = src_meshes.cuda()
             gt_pose_params = gt_pose_params.cuda()
             scale = scale.cuda()
             centroid = centroid.cuda()
             gt_multi_view = gt_multi_view.cuda()
+
             src_meshes = ico_sphere(4, trg_im.device).extend(trg_im.shape[0])
             
             R_gt, T_gt = look_at_view_transform(dist=torch.ones(trg_im.shape[0]).cuda()*1.38, elev=gt_pose_params[:, 1], azim=gt_pose_params[:, 0])
@@ -349,7 +294,6 @@ def test(data_loader, trg_classes):
             rotate_centroid = rotate_centroid.squeeze()
             cameras = FoVPerspectiveCameras(device=device, R=torch.eye(3).unsqueeze(0).expand(trg_im.shape[0], 3, 3), T=T_gt, fov=gt_pose_params[:, 3])
             pred_meshes_list, pred_init_pcs, _ = model(trg_im, src_meshes, cameras, scale, rotate_centroid)
-            # pred_meshes_list, _ = model(trg_im, src_meshes, cameras, scale, rotate_centroid)
             pred_meshes = pred_meshes_list[-1]
             verts = pred_meshes.verts_padded()
             if not torch.isfinite(verts).all():
@@ -363,28 +307,12 @@ def test(data_loader, trg_classes):
                 continue
 
             pred_verts_canonical = transform_gt_inverse.transform_points(verts)
-            # _centroid = torch.mean(pred_verts_canonical, dim=1)
-            # pred_verts_canonical = pred_verts_canonical - _centroid.unsqueeze(1).expand_as(pred_verts_canonical)
-            # _scale = torch.max(torch.sqrt(torch.sum(pred_verts_canonical ** 2, dim=2)), dim=1)[0] + 1e-4
-            # pred_verts_canonical = pred_verts_canonical / _scale.unsqueeze(1).unsqueeze(1)
             pred_meshes = pred_meshes.update_padded(pred_verts_canonical)
 
             pred_pc = sample_points_from_meshes(pred_meshes, opt.point_num)
             chamfer_dist1, chamfer_dist2, _, _= distChamfer(trg_pc, pred_pc)
             val_loss = torch.mean(chamfer_dist1 + chamfer_dist2, 1)
 
-            # pred_init_pcs = transform_gt_inverse.transform_points(pred_init_pcs)
-            # pred_init_pcs = pred_init_pcs*torch.FloatTensor([[-1,1,-1]]).cuda().unsqueeze(0)
-            # chamfer_dist1, chamfer_dist2, _, _= distChamfer(trg_pc, pred_init_pcs)
-            # val_pcs_chamfer = torch.mean(chamfer_dist1 + chamfer_dist2, 1)
-
-            # pred_pose = get_pred_angle(pose_params)
-            # pred_silhouette = get_render_img(azim=pred_pose[:, 0], elev=pred_pose[:, 1], distance=gt_pose_params[:, 2], view=gt_pose_params[:, 3], 
-            #                                     mesh=pred_meshes, multi_view_distance=gt_pose_params[:, 4], raw_scale=scale, raw_centroid=centroid, render_rgb=False, train=False)
-
-            # pred_verts_canonical = transform_gt_inverse.transform_points(pred_meshes.verts_padded())
-            # pred_verts_canonical = pred_verts_canonical*torch.FloatTensor([[-1,1,-1]]).cuda().unsqueeze(0)
-            # pred_meshes = pred_meshes.update_padded(pred_verts_canonical)
             pred_multi_view_silhouette = get_multi_view_silhouatte_test(distance=gt_pose_params[:, 4], view=gt_pose_params[:, 3], mesh=pred_meshes, raw_scale=scale, raw_centroid=centroid)
             multi_view_iou = get_iou(pred_multi_view_silhouette, gt_multi_view, size_average=False)
 
@@ -416,27 +344,23 @@ def test(data_loader, trg_classes):
                             win='VAL_OUTPUT',
                             opts=dict(title="VAL_OUTPUT", markersize=2, width=opt.win_size, height=opt.win_size),
                             )
-                # vis.scatter(X=pred_init_pcs[0].data.cpu(),
-                #             win='VAL_INIT_PCS',
-                #             opts=dict(title="VAL_INIT_PCS", markersize=2, width=opt.win_size, height=opt.win_size),
-                #             )
+                vis.scatter(X=pred_init_pcs[0].data.cpu(),
+                            win='VAL_INIT_PCS',
+                            opts=dict(title="VAL_INIT_PCS", markersize=2, width=opt.win_size, height=opt.win_size),
+                            )
                 vis.scatter(X=gt_vis_x,
                             win='VAL_GT',
                             opts=dict(title="VAL_GT", markersize=2, width=opt.win_size, height=opt.win_size),
                             )
     mean_chamfer = []
-    # init_mean_chamfer = []
     mean_iou = []
     for cat in trg_classes:
         mean_chamfer.append(val_distance[cat].avg)
-        # init_mean_chamfer.append(val_init_pcs_distance[cat].avg)
         mean_iou.append(val_multi_view[cat].avg)
         print(cat, val_distance[cat].avg, val_init_pcs_distance[cat].avg, val_multi_view[cat].avg)
 
     plot_data_val['X'].append(epoch)
     plot_data_val['Y'].append([val_distance[cat].avg for cat in trg_classes]+[np.mean(mean_chamfer)])
-    # plot_data_val['Init PCs'].append([val_init_pcs_distance[cat].avg for cat in trg_classes]+[np.mean(init_mean_chamfer)])
-    # plot_data_val['Pose'].append([val_pose_similarity[cat].avg for cat in trg_classes]+[np.mean(pose_mean)])
     plot_data_val['IoU'].append([val_multi_view[cat].avg for cat in trg_classes]+[np.mean(mean_iou)])
     vis.line(X=np.stack([np.array(plot_data_val['X'])]*len(plot_data_val['legend']),1),
              Y=np.array(plot_data_val['Y']),
@@ -447,15 +371,6 @@ def test(data_loader, trg_classes):
                 'width': opt.win_size, 
                 'height': opt.win_size},
              win='Validation loss')
-    # vis.line(X=np.stack([np.array(plot_data_val['X'])]*len(plot_data_val['legend']),1),
-    #          Y=np.array(plot_data_val['Init PCs']),
-    #          opts={'title': opt.name + ' val init pcs chamfer',
-    #             'legend': plot_data_val['legend'],
-    #             'xlabel': 'epoch',
-    #             'ylabel': 'loss',
-    #             'width': opt.win_size, 
-    #             'height': opt.win_size},
-    #          win='init pcs')
     vis.line(X=np.stack([np.array(plot_data_val['X'])]*len(plot_data_val['legend']),1),
              Y=np.array(plot_data_val['IoU']),
              opts={'title': opt.name + ' multi-view IoU',
@@ -482,18 +397,18 @@ lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
     optimizer, [100, 200, 230], 0.3
 )
 
-loed_model_name = '/home/xianghui_yang/viewer_centered/log/2022-03-08_0shot_viewer_no_distance/model-99-0.0080.pth'
-pretrained_dict = torch.load(loed_model_name)
-model.load_state_dict(pretrained_dict, strict=True)
-print("Previous weight loaded: ", loed_model_name)
-loed_model_name = '/home/xianghui_yang/viewer_centered/log/2022-03-08_0shot_viewer_no_distance/optimizer-99-0.0080.pth'
-pretrained_dict = torch.load(loed_model_name)
-optimizer.load_state_dict(pretrained_dict)
-print("Previous weight loaded: ", loed_model_name)
-loed_model_name = '/home/xianghui_yang/viewer_centered/log/2022-03-08_0shot_viewer_no_distance/lr_scheduler-99-0.0080.pth'
-pretrained_dict = torch.load(loed_model_name)
-lr_scheduler.load_state_dict(pretrained_dict)
-print("Previous weight loaded: ", loed_model_name)
+# loed_model_name = '/home/xianghui_yang/viewer_centered/log/2022-03-08_0shot_viewer_no_distance/model-99-0.0080.pth'
+# pretrained_dict = torch.load(loed_model_name)
+# model.load_state_dict(pretrained_dict, strict=True)
+# print("Previous weight loaded: ", loed_model_name)
+# loed_model_name = '/home/xianghui_yang/viewer_centered/log/2022-03-08_0shot_viewer_no_distance/optimizer-99-0.0080.pth'
+# pretrained_dict = torch.load(loed_model_name)
+# optimizer.load_state_dict(pretrained_dict)
+# print("Previous weight loaded: ", loed_model_name)
+# loed_model_name = '/home/xianghui_yang/viewer_centered/log/2022-03-08_0shot_viewer_no_distance/lr_scheduler-99-0.0080.pth'
+# pretrained_dict = torch.load(loed_model_name)
+# lr_scheduler.load_state_dict(pretrained_dict)
+# print("Previous weight loaded: ", loed_model_name)
     
 for epoch in range(opt.n_epoch):
     # train

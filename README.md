@@ -42,7 +42,11 @@ Or you can install step by step by yourself.
 Dowanload the ShapeNet dataset and corresponding [renderings](). We provide our renderings and split file here. Run the preprocess scipt in the fold `preprossing/` to normalize the mesh. We also provide the processed files here.
 
 ## Training
-To train your NVF, you can change the parameters in the configs and run:
+To visualize the generated meshes, make sure you lauch the visdom server before trianing.
+```
+python -m visdom.server
+```
+You can run it in the background mode or on a sperate wiwindow. Or if you don't need it, comment the visulization lines in the codes. To train your NVF, you can change the parameters in the configs and run:
 ```
 bash train.sh
 ```

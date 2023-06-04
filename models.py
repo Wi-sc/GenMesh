@@ -162,134 +162,6 @@ class PointDeform(nn.Module):
         x = self.th(self.conv4(x))
         return x
 
-class Information_Exchange(nn.Module):
-    def __init__(self, inplanes=256):
-        super(Information_Exchange, self).__init__()
-
-        self.sub_sample = False
-        self.in_channels = inplanes
-        self.inter_channels = inplanes
-
-        self.in_q = nn.Conv1d(in_channels=self.in_channels, out_channels=self.in_channels, kernel_size=1, stride=1, padding=0)
-        self.in_s = nn.Conv1d(in_channels=self.in_channels, out_channels=self.in_channels, kernel_size=1, stride=1, padding=0)
-        self.conv_q = nn.Conv1d(in_channels=self.in_channels, out_channels=self.inter_channels, kernel_size=1, stride=1, padding=0)
-        self.conv_s = nn.Conv1d(in_channels=self.in_channels, out_channels=self.inter_channels, kernel_size=1, stride=1, padding=0)
-        self.g = nn.Conv1d(in_channels=self.in_channels, out_channels=self.inter_channels, kernel_size=1, stride=1, padding=0)
-
-        self.out_q = nn.Sequential(
-            nn.Conv1d(in_channels=self.inter_channels, out_channels=self.in_channels, kernel_size=1, stride=1, padding=0),
-            nn.BatchNorm1d(self.in_channels)
-        )
-        nn.init.constant_(self.out_q[1].weight, 0)
-        nn.init.constant_(self.out_q[1].bias, 0)
-
-        self.out_s = nn.Sequential(
-            nn.Conv1d(in_channels=self.inter_channels, out_channels=self.in_channels, kernel_size=1, stride=1, padding=0),
-            nn.BatchNorm1d(self.in_channels)
-        )
-        nn.init.constant_(self.out_s[1].weight, 0)
-        nn.init.constant_(self.out_s[1].bias, 0)
-
-        
-
-        # self.mlp= nn.Sequential(
-        #     nn.Linear(self.in_channels, self.inter_channels),
-        #     nn.ReLU(),
-        #     nn.Linear(self.inter_channels, self.inter_channels)
-        #     )
-
-    def forward(self, q, s):
-        batch_size, _, height_q, width_q = q.shape
-        _, _, num_points = s.shape
-        q = q.view(batch_size, self.in_channels, -1)
-        s = s.view(batch_size, self.in_channels, -1)
-        q_x = self.in_q(q)
-        s_x = self.in_s(s)
-
-        theta_s_x = self.conv_s(s_x)
-        theta_s_x = theta_s_x.permute(0, 2, 1)
-        theta_q_x = self.conv_q(q_x)
-        f = torch.matmul(theta_s_x, theta_q_x)
-        # f_div_C = f / f.size(-1)
-        f_p_hw = F.softmax(f, dim=-1)
-        f = f.permute(0, 2, 1).contiguous()
-        # fi_div_C = f / f.size(-1)
-        f_hw_p = F.softmax(f, dim=-1)
-
-        q_x = self.g(q_x).permute(0, 2, 1)
-        s_x = self.g(s_x).permute(0, 2, 1)
-        non_s = torch.matmul(f_p_hw, q_x)
-        non_s = non_s.permute(0, 2, 1).contiguous()
-        non_s = self.out_s(non_s)
-        non_s = non_s + s
-
-        non_q = torch.matmul(f_hw_p, s_x)
-        non_q = non_q.permute(0, 2, 1).contiguous()
-        non_q = self.out_q(non_q)
-        non_q = non_q + q
-
-        non_q = non_q.view(batch_size, self.in_channels, height_q, width_q)
-        non_s = non_s.view(batch_size, self.in_channels, num_points)
-        return non_q, non_s
-        # ##################################### Response in chaneel weight ####################################################
-        # avg_pool = F.avg_pool1d(non_s, kernel_size=num_points, stride=num_points)
-        # c_weight = self.mlp(avg_pool.view(batch_size, -1))
-        # # max_pool = F.max_pool1d(non_s, kernel_size=num_points, stride=num_points)
-        # # c_weight = c_weight + self.mlp(max_pool.view(batch_size, -1))
-        # c_weight = torch.sigmoid(c_weight).unsqueeze(-1)
-        # act_s = non_s * c_weight
-        # act_q = non_q * c_weight
-        # act_q = non_q.view(batch_size, self.in_channels, height_q, width_q)
-        # act_s = non_s.view(batch_size, self.in_channels, num_points)
-        # return act_q, act_s
-
-
-class SE(nn.Module):
-    def __init__(self, inplanes=256):
-        super(SE, self).__init__()
-        self.in_channels = inplanes
-        self.inter_channels = inplanes//2
-
-        self.in_2d = nn.Conv1d(in_channels=self.in_channels, out_channels=self.in_channels, kernel_size=1, stride=1, padding=0)
-        self.in_3d = nn.Conv1d(in_channels=self.in_channels, out_channels=self.in_channels, kernel_size=1, stride=1, padding=0)
-        self.out_2d = nn.Sequential(
-            nn.Conv1d(in_channels=self.in_channels, out_channels=self.in_channels, kernel_size=1, stride=1, padding=0),
-            nn.BatchNorm1d(self.in_channels)
-        )
-        nn.init.constant_(self.out_2d[1].weight, 0)
-        nn.init.constant_(self.out_2d[1].bias, 0)
-        self.out_3d = nn.Sequential(
-            nn.Conv1d(in_channels=self.in_channels, out_channels=self.in_channels, kernel_size=1, stride=1, padding=0),
-            nn.BatchNorm1d(self.in_channels)
-        )
-        nn.init.constant_(self.out_3d[1].weight, 0)
-        nn.init.constant_(self.out_3d[1].bias, 0)
-
-        self.mlp= nn.Sequential(
-            nn.Linear(self.in_channels, self.inter_channels),
-            nn.ReLU(),
-            nn.Linear(self.inter_channels, self.in_channels)
-            )
-
-    def forward(self, x_2d, x_3d):
-        batch_size, _, height, width = x_2d.shape
-        _, _, num_points = x_3d.shape
-
-        x_2d = x_2d.view(batch_size, self.in_channels, -1)
-        x_3d = x_3d.view(batch_size, self.in_channels, -1)
-        x_2d = self.in_2d(x_2d)
-        x_3d = self.in_3d(x_3d)
-
-        avg_pool = F.avg_pool1d(x_3d, kernel_size=num_points, stride=num_points)
-        c_weight = self.mlp(avg_pool.view(batch_size, -1))
-        c_weight = torch.sigmoid(c_weight).unsqueeze(-1)
-        x_2d = x_2d * c_weight
-        x_3d = x_3d * c_weight
-        x_2d = self.out_2d(x_2d).view(batch_size, self.in_channels, height, width)
-        x_3d = self.out_3d(x_3d).view(batch_size, self.in_channels, num_points)
-        return x_2d, x_3d
-
-
 class Network_0_shot(nn.Module):
     def __init__(self, bottleneck_size=512, deform_num=3):
         super(Network_0_shot, self).__init__()
@@ -528,7 +400,7 @@ if __name__ == "__main__":
     print(meshes.verts_padded().shape)
 
     
-    model = Network_No_2D_Local(deform_num=3)
+    model = Network_0_shot(deform_num=3)
     model = model.to(img.device)
     pred_meshes_list, pred_pcs, offset_list = model(img, meshes, transform, scale, centroid)
     print(pred_meshes_list[0].verts_padded().shape, pred_meshes_list[1].verts_padded().shape, pred_meshes_list[2].verts_padded().shape)
